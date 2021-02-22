@@ -1,0 +1,21 @@
+{
+  "name": "plugins-system",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "father-build",
+    "start": "cross-env BROWSER=none node ./packages/cli/bin/index.js dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "lerna": "^3.22.1"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "father-build": "^1.19.1",
+    "plugin-a": "^0.0.0"
+  }
+}
