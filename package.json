@@ -11,11 +11,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "lerna": "^3.22.1"
+    "lerna": "^3.22.1",
+    "progress": "^2.0.3"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
     "father-build": "^1.19.1",
-    "plugin-a": "^0.0.0"
+    "plugin-a": "0.0.0"
   }
 }

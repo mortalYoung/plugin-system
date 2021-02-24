@@ -21,8 +21,16 @@ const pkg = require('../../../package.json');
 
 const path = require('path');
 
-const logger = str => {
-  console.log(`[Service]: ${str}`);
+const fs = require('fs');
+
+const ProgressBar = require('progress');
+
+const noisy = true;
+
+const logger = (str, noi = noisy) => {
+  if (noi) {
+    console.log(`[Service]: ${str}`);
+  }
 };
 
 var IStage;
@@ -38,15 +46,31 @@ var IStage;
 class Service {
   // 根目录
   // 在 init 阶段无法执行插件
-  // 插件执行
+  // 用于标记是否在 Ready 阶段之前执行了 run 函数 如果是则缓存一下等到 Ready 阶段执行 run 函数
   constructor(props) {
     this.cwd = '';
     this.plugins = {};
     this.stage = IStage.Init;
-    this.cachePlugins = [];
-    logger('启动核心模块');
-    this.initCwd();
-    this.findPlugins();
+    this.bufferRun = false;
+    logger('启动核心模块', true);
+    const bar = new ProgressBar('  bootstraping [:bar] :percent', {
+      complete: '=',
+      incomplete: ' ',
+      width: 20,
+      total: 5,
+      clear: true
+    });
+    const timeout = setInterval(() => {
+      bar.tick();
+
+      if (bar.complete) {
+        clearInterval(timeout);
+        this.initCwd();
+        this.findPlugins(); // 启动完成核心模块后进入 ready 阶段
+
+        this.ready();
+      }
+    }, 500);
   }
 
   setStage(stage, callback) {
@@ -93,31 +117,29 @@ class Service {
   }
 
   run() {
-    logger('加载核心模块');
-    Object.keys(this.plugins).forEach(key => {
-      const pluginPath = this.plugins[key].path;
+    if (this.stage < IStage.Ready) {
+      // 如果还没到 ready 阶段无法执行 run
+      this.bufferRun = true;
+    } else {
+      logger('加载核心模块', true);
+      Object.keys(this.plugins).forEach(key => {
+        const pluginPath = this.plugins[key].path;
 
-      const pluginPkg = require(path.resolve(pluginPath, 'package.json'));
+        const pluginPkg = require(path.resolve(pluginPath, 'package.json'));
 
-      const mainEntry = path.resolve(this.plugins[key].path, pluginPkg.main);
+        const mainEntry = path.resolve(this.plugins[key].path, pluginPkg.main);
 
-      const plugin = require(mainEntry);
+        const plugin = require(mainEntry);
 
-      this.cachePlugins.push(plugin(IStage));
-    });
-    this.pipe();
-  }
+        Object.assign(this.plugins[key], plugin(IStage));
+      }); // 去触发在 Ready 阶段执行的 plugins
 
-  pipe() {
-    logger('运行服务, 服务简单地分 4 个阶段');
-    this.ready();
-    this.mount();
-    this.update();
-    this.unmount();
+      this.switchStage(null, IStage.Ready);
+    }
   }
 
   switchStage(prevStage, nextStage) {
-    const currentPlugins = this.cachePlugins.filter(plugin => plugin.timing === nextStage);
+    const currentPlugins = Object.values(this.plugins).filter(plugin => plugin.timing === nextStage);
     currentPlugins.forEach(plugin => {
       // 执行当前 stage 的插件
       plugin.handler();
@@ -125,22 +147,27 @@ class Service {
   }
 
   ready() {
-    logger('ready 阶段');
+    logger('ready 阶段', true);
     this.setStage(IStage.Ready, this.switchStage.bind(this));
+
+    if (this.bufferRun) {
+      this.bufferRun = false;
+      this.run();
+    }
   }
 
   mount() {
-    logger('mount 阶段');
+    logger('mount 阶段', true);
     this.setStage(IStage.Mount, this.switchStage.bind(this));
   }
 
   update() {
-    logger('update 阶段');
+    logger('update 阶段', true);
     this.setStage(IStage.Update, this.switchStage.bind(this));
   }
 
   unmount() {
-    logger('unmount 阶段');
+    logger('unmount 阶段', true);
     this.setStage(IStage.Unmount, this.switchStage.bind(this));
   }
 
